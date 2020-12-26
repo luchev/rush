@@ -1,18 +1,17 @@
 use std::path::Path;
-use std::ffi::OsString;
 
 /// Return non-directory portion of pathname
-fn basename(paths: &[&str]) -> Vec<Result<OsString, OsString>> {
-    paths.iter().map(|x| basename_one(x)).collect()
+pub fn basename(args: &[&str]) -> Vec<Result<String, String>> {
+    args.iter().map(|x| basename_one(x)).collect()
 }
 
-fn basename_one(path: &str) -> Result<OsString, OsString> {
+fn basename_one(path: &str) -> Result<String, String> {
     if !path.contains("/") {
-        Ok(OsString::from(path))
+        Ok(String::from(path))
     } else {
-        match Path::new(path).file_name() {
-            Some(x) => Ok(OsString::from(x)),
-            None => Err(format!("{} has no basename", path).into()),
+        match Path::new(path).file_name().map(|x| x.to_str()).map(|x| x.unwrap()) {
+            Some(x) => Ok(format!("{}{}", x, '\n')),
+            None => Err(format!("{} has no basename\n", path).into()),
         }
     }
 }
@@ -24,13 +23,13 @@ mod tests {
 
     #[test]
     fn test_basename() {
-        assert_eq!("tmp", basename(&["/tmp"])[0].as_ref().unwrap());
-        assert_eq!("bin", basename(&["/usr/bin"])[0].as_ref().unwrap());
-        assert_eq!("bin", basename(&["/usr/bin/"])[0].as_ref().unwrap());
-        assert_eq!("file.txt", basename(&["/tmp/file.txt"])[0].as_ref().unwrap());
-        assert_eq!("file.txt", basename(&["file.txt"])[0].as_ref().unwrap());
-        assert_eq!("file.txt", basename(&["./file.txt"])[0].as_ref().unwrap());
-        assert_eq!(".", basename(&["."])[0].as_ref().unwrap());
+        assert_eq!("tmp", basename(&["/tmp"])[0].as_ref().unwrap().trim());
+        assert_eq!("bin", basename(&["/usr/bin"])[0].as_ref().unwrap().trim());
+        assert_eq!("bin", basename(&["/usr/bin/"])[0].as_ref().unwrap().trim());
+        assert_eq!("file.txt", basename(&["/tmp/file.txt"])[0].as_ref().unwrap().trim());
+        assert_eq!("file.txt", basename(&["file.txt"])[0].as_ref().unwrap().trim());
+        assert_eq!("file.txt", basename(&["./file.txt"])[0].as_ref().unwrap().trim());
+        assert_eq!(".", basename(&["."])[0].as_ref().unwrap().trim());
 
         let err = basename(&["/"]);
         assert!(err.len() == 1);
