@@ -1,18 +1,17 @@
 use std::path::Path;
-use std::ffi::OsString;
 
 /// Return directory portion of pathname
-fn dirname(paths: &[&str]) -> Vec<Result<OsString, OsString>> {
+pub fn dirname(paths: &[&str]) -> Vec<Result<String, String>> {
     paths.iter().map(|x| dirname_one(x)).collect()
 }
 
-fn dirname_one(path: &str) -> Result<OsString, OsString> {
+fn dirname_one(path: &str) -> Result<String, String> {
     if !path.contains("/") {
-        Ok(OsString::from("."))
+        Ok(String::from("."))
     } else {
-        match Path::new(path).parent().map(|x| x.as_os_str()) {
-            Some(x) => Ok(OsString::from(x)),
-            None => Err(format!("{} has no parent directory", path).into()),
+        match Path::new(path).parent().map(|x| x.as_os_str()).map(|x| x.to_str()).map(|x| x.unwrap()) {
+            Some(x) => Ok(format!("{}{}", x, '\n')),
+            None => Err(format!("{} has no parent directory\n", path).into()),
         }
     }
 }
@@ -24,13 +23,13 @@ mod tests {
 
     #[test]
     fn test_dirname() {
-        assert_eq!("/", dirname(&["/tmp"])[0].as_ref().unwrap());
-        assert_eq!("/usr", dirname(&["/usr/bin"])[0].as_ref().unwrap());
-        assert_eq!("/usr", dirname(&["/usr/bin/"])[0].as_ref().unwrap());
-        assert_eq!("/tmp", dirname(&["/tmp/file.txt"])[0].as_ref().unwrap());
-        assert_eq!(".", dirname(&["file.txt"])[0].as_ref().unwrap());
-        assert_eq!(".", dirname(&["./file.txt"])[0].as_ref().unwrap());
-        assert_eq!(".", dirname(&["."])[0].as_ref().unwrap());
+        assert_eq!("/", dirname(&["/tmp"])[0].as_ref().unwrap().trim());
+        assert_eq!("/usr", dirname(&["/usr/bin"])[0].as_ref().unwrap().trim());
+        assert_eq!("/usr", dirname(&["/usr/bin/"])[0].as_ref().unwrap().trim());
+        assert_eq!("/tmp", dirname(&["/tmp/file.txt"])[0].as_ref().unwrap().trim());
+        assert_eq!(".", dirname(&["file.txt"])[0].as_ref().unwrap().trim());
+        assert_eq!(".", dirname(&["./file.txt"])[0].as_ref().unwrap().trim());
+        assert_eq!(".", dirname(&["."])[0].as_ref().unwrap().trim());
 
         let err = dirname(&["/"]);
         assert!(err.len() == 1);
