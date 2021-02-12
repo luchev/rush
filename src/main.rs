@@ -1,17 +1,23 @@
 mod libc_bindings;
-mod prompt;
 mod util;
+mod config;
+mod prompt;
+use crate::config::Config;
 
-use prompt::Prompt;
 use std::collections::HashMap;
 use std::io::{self, Write};
 
 fn main() {
-    // simple_commands();
-
-    let prompt = Prompt::new();
-    while let command = prompt.next() {
-        println!("{:?}", command);
+    let conf = Config::default();
+    let prompt = conf.prompt.clone();
+    loop {
+        let command = prompt.next();
+        match command {
+            Ok(x) => {
+                println!("{:?}", x)
+            },
+            Err(x) => println!("{}", x),
+        }
     }
 }
 

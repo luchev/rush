@@ -13,12 +13,10 @@ pub fn user_home_dir_by_user_name(name: &str) -> Result<String, String> {
         let name = match CStr::from_ptr(passwd.pw_dir).to_str() {
             Ok(x) => x.to_string(),
             Err(_) => {
-                libc::free(passwd_ptr as *mut libc::c_void);
                 return Err("Failed to convert user home directory to UTF8".to_string());
             }
         };
-        
-        // libc::free(passwd_ptr as *mut libc::c_void);
+
         return Ok(name);
     };
 }
