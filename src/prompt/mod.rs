@@ -5,10 +5,10 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use std::io::Write;
 
-pub enum PromptResult<T> {
+pub enum Result {
     Commands(Vec<TopLevelCommand<String>>),
     EOF,
-    Error(ParseError::<T>),
+    Error(ParseError::<String>),
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -41,86 +41,28 @@ impl Default for Prompt {
 }
 
 impl Prompt {
-    pub fn next(&self) -> Result<Vec<TopLevelCommand<String>>, ParseError<String>> {
+    pub fn next(&self) -> Result {
         let stdin = io::stdin();
         let mut stdout = io::stdout();
         let mut line = String::new();
 
         let _ = stdout.write(self.ps1.as_bytes());
         let _ = stdout.flush();
-        let mut state = Err(ParseError::Custom("".to_string()));
-        while state.is_err() {
+        let mut state = Result::Error(ParseError::Custom("".to_string()));
+        while let Result::Error(_) = state {
             state = match stdin.read_line(&mut line) {
-                Ok(0) => return Err(ParseError::Custom("EOF".to_string())),
-                Err(x) => Err(ParseError::Custom(x.to_string())),
+                Ok(0) => return Result::EOF,
+                Err(x) => Result::Error(ParseError::Custom(x.to_string())),
                 _ => {
                     let lexer = Lexer::new(line.chars());
-                    Ok(DefaultParser::new(lexer)
-                        .into_iter()
-                        .collect::<Result<Vec<_>, _>>())
+                    match DefaultParser::new(lexer).into_iter().collect::<std::result::Result<Vec<TopLevelCommand<String>>, _>>() {
+                        Ok(x) => Result::Commands(x),
+                        Err(x) => Result::Error(ParseError::Custom(x.to_string())),
+                    }
                 }
             }
         }
 
-        match state {
-            Ok(x) => match x {
-                Ok(x) => Ok(x),
-                Err(x) => Err(ParseError::Custom(x.to_string())),
-            },
-            Err(_) => Err(ParseError::Custom("".to_string())),
-        }
+        state
     }
 }
-
-// TODO handle single open " or ' at the end and maybe || && \ and |
-// fn tokenize_line(line: &str) -> Result<Vec<Token>, ()> {
-//     let mut tokens = Vec::new();
-//     let mut in_double_quote = false;
-//     let mut in_single_quote = false;
-//     let mut escaped_character = false;
-
-//     let mut token_content = String::new();
-
-//     for ch in line.chars() {
-//         if ch.is_whitespace() && !in_double_quote && !in_single_quote {
-//             tokens.push(Token::Simple(token_content));
-//             token_content = String::new();
-//         } else if ch == '"' && in_double_quote && !in_single_quote && !escaped_character {
-//             tokens.push(Token::DoubleQuotes(token_content));
-//             token_content = String::new();
-//             in_double_quote = false;
-//         } else if ch == '\'' && in_single_quote && !in_double_quote && !escaped_character {
-//             tokens.push(Token::Simple(token_content));
-//             token_content = String::new();
-//             in_single_quote = true;
-//         } else if ch == '"' && !in_double_quote && !in_single_quote && !escaped_character {
-//             in_double_quote = true;
-//         } else if ch == '\'' && !in_single_quote && !in_double_quote && !escaped_character {
-//             in_single_quote = true;
-//         } else if ch != '\\' {
-//             token_content.push(ch);
-//         }
-
-//         escaped_character = ch == '\\';
-//     }
-
-//     if !token_content.is_empty() {
-//         tokens.push(Token::Simple(token_content));
-//     }
-
-//     if in_double_quote || in_single_quote {
-//         return Err(())
-//     }
-//     if !tokens.is_empty() {
-//         match tokens.last().unwrap() {
-//             Token::Simple(inside) => {
-//                 if inside.ends_with("|") || inside.ends_with("&&") || inside.ends_with("||") {
-//                     return Err(());
-//                 }
-//             },
-//             _ => (),
-//         }
-//     }
-
-//     Ok(tokens)
-// }
