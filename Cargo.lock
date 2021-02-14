@@ -141,6 +141,7 @@ name = "rush"
 version = "0.1.0"
 dependencies = [
  "conch-parser",
+ "lazy_static",
  "libc",
  "pretty_assertions",
  "regex",
