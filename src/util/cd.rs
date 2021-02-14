@@ -1,29 +1,41 @@
 // cd ~username will put you in username's home directory.
 use std::env;
 use crate::libc_bindings::user_home_dir_by_user_name;
+use std::os::unix::process::ExitStatusExt;
+use std::process::ExitStatus;
 
 /// Return directory portion of pathname
-pub fn cd(args: &[&str]) -> Vec<Result<String, String>> {
+pub fn cd(args: &[&str]) -> ExitStatus {
     if args.len() > 1 {
-        return vec![Err("Too many arguments\n".into())];
+        eprintln!("Too many arguments");
+        return ExitStatusExt::from_raw(1);
     }
 
     let next_dir;
     if args.len() == 0 || args.len() == 1 && args[0] == "~" {
         next_dir = match env::var("HOME") {
             Ok(x) => x,
-            Err(_) => return vec![Err("Can't find HOME in ENV\n".into())],
+            Err(_) => {
+                eprintln!("Can't find HOME in ENV");
+                return ExitStatusExt::from_raw(2);
+            },
         }
     } else if args[0] == "-" {
         next_dir = match env::var("OLDPWD") {
             Ok(x) => x,
-            Err(_) => return vec![Err("Can't find OLDPWD in ENV\n".into())],
+            Err(_) => {
+                eprintln!("Can't find OLDPWD in ENV");
+                return ExitStatusExt::from_raw(3);
+            },
         }
     } else if args[0].chars().next() == Some('~') {
         let home_dir = user_home_dir_by_user_name(&args[0][1..]);
         match home_dir {
             Ok(x) => next_dir = x,
-            Err(_) => return vec![Err(format!("Couldn't find home dir for user {}", &args[0][1..]))],
+            Err(_) => {
+                eprintln!("Couldn't find home dir for user {}", &args[0][1..]);
+                return ExitStatusExt::from_raw(4);
+            },
         }
     } else {
         next_dir = args[0].into();
@@ -34,9 +46,12 @@ pub fn cd(args: &[&str]) -> Vec<Result<String, String>> {
         Ok(_) => {
             env::set_var("OLDPWD", old_pwd);
             env::set_var("PWD", env::current_dir().unwrap_or_default());
-            vec![]
+            ExitStatusExt::from_raw(0)
         },
-        Err(x) => vec![Err(format!("{}\n", x))],
+        Err(x) => {
+            eprintln!("{}\n", x);
+            ExitStatusExt::from_raw(5)
+        },
     }
 }
 
@@ -131,5 +146,13 @@ mod tests {
         let _ = env::set_current_dir("/");
         let _ = cd(&["etc"]);
         assert_eq!("/etc", env::current_dir().unwrap().into_os_string());
+    }
+
+    #[test]
+    fn test_cd() {
+        assert!(cd(&["/"]).success());
+        assert!(cd(&["/tmp"]).success());
+
+        assert!(!cd(&[("/".to_string() + "😊".repeat(700).as_ref()).as_ref()]).success());
     }
 }

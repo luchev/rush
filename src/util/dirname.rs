@@ -1,8 +1,19 @@
+use std::os::unix::process::ExitStatusExt;
 use std::path::Path;
+use std::process::ExitStatus;
 
 /// Return directory portion of pathname
-pub fn dirname(paths: &[&str]) -> Vec<Result<String, String>> {
-    paths.iter().map(|x| dirname_one(x)).collect()
+pub fn dirname(args: &[&str]) -> ExitStatus {
+    for arg in args {
+        match dirname_one(arg) {
+            Ok(x) => println!("{}", x),
+            Err(x) => {
+                eprintln!("{}", x);
+                return ExitStatusExt::from_raw(1);
+            }
+        }
+    }
+    ExitStatusExt::from_raw(0)
 }
 
 fn dirname_one(path: &str) -> Result<String, String> {
@@ -10,7 +21,7 @@ fn dirname_one(path: &str) -> Result<String, String> {
         Ok(String::from("."))
     } else {
         match Path::new(path).parent().map(|x| x.as_os_str()).map(|x| x.to_str()).map(|x| x.unwrap()) {
-            Some(x) => Ok(format!("{}{}", x, '\n')),
+            Some(x) => Ok(format!("{}", x)),
             None => Err(format!("{} has no parent directory\n", path).into()),
         }
     }
@@ -22,17 +33,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_dirname() {
-        assert_eq!("/", dirname(&["/tmp"])[0].as_ref().unwrap().trim());
-        assert_eq!("/usr", dirname(&["/usr/bin"])[0].as_ref().unwrap().trim());
-        assert_eq!("/usr", dirname(&["/usr/bin/"])[0].as_ref().unwrap().trim());
-        assert_eq!("/tmp", dirname(&["/tmp/file.txt"])[0].as_ref().unwrap().trim());
-        assert_eq!(".", dirname(&["file.txt"])[0].as_ref().unwrap().trim());
-        assert_eq!(".", dirname(&["./file.txt"])[0].as_ref().unwrap().trim());
-        assert_eq!(".", dirname(&["."])[0].as_ref().unwrap().trim());
+    fn test_dirname_one() {
+        assert_eq!("/", dirname_one("/tmp").unwrap().trim());
+        assert_eq!("/usr", dirname_one("/usr/bin").unwrap().trim());
+        assert_eq!("/usr", dirname_one("/usr/bin/").unwrap().trim());
+        assert_eq!("/tmp", dirname_one("/tmp/file.txt").unwrap().trim());
+        assert_eq!(".", dirname_one("file.txt").unwrap().trim());
+        assert_eq!(".", dirname_one("./file.txt").unwrap().trim());
+        assert_eq!(".", dirname_one(".").unwrap().trim());
 
-        let err = dirname(&["/"]);
-        assert!(err.len() == 1);
-        assert!(err[0].is_err());
+        let err = dirname_one("/");
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_basename() {
+        assert!(dirname(&["/tmp"]).success());
+        assert!(dirname(&["/tmp", "/usr/bin"]).success());
+
+        assert!(!dirname(&["/", "/usr/bin"]).success());
+        assert!(!dirname(&["/usr/bin", "/"]).success());
     }
 }

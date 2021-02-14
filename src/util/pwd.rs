@@ -1,33 +1,38 @@
 use std::env;
+use std::os::unix::process::ExitStatusExt;
+use std::process::ExitStatus;
 
 /// Return directory portion of pathname
-pub fn pwd(args: &[&str]) -> Vec<Result<String, String>> {
+pub fn pwd(args: &[&str]) -> ExitStatus {
     if args.len() > 0 {
-        vec![Err(String::from("Too many arguments\n"))]
+        eprintln!("Too many arguments");
+        ExitStatusExt::from_raw(1)
     } else {
         match env::current_dir() {
-            Ok(x) => vec![Ok(format!("{}\n", x.into_os_string().to_str().unwrap()))],
-            Err(x) => vec![Err(format!("{}\n", x))],
+            Ok(x) => {
+                println!("{}", x.into_os_string().to_str().unwrap());
+                ExitStatusExt::from_raw(0)
+            },
+            Err(x) => {
+                eprintln!("{}", x);
+                ExitStatusExt::from_raw(2)
+            },
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::{assert_eq};
     use super::*;
 
     #[test]
     fn test_pwd() {
         let _ = env::set_current_dir("/");
-        assert_eq!("/", pwd(&[])[0].as_ref().unwrap().trim());
-
-        let _ = env::set_current_dir("/etc");
-        assert_eq!("/etc", pwd(&[])[0].as_ref().unwrap().trim());
+        assert!(pwd(&[]).success());
 
         let _ = env::set_current_dir("/usr");
-        assert_eq!("/usr", pwd(&[])[0].as_ref().unwrap().trim());
+        assert!(pwd(&[]).success());
         
-        assert!(pwd(&["home"])[0].is_err());
+        assert!(!pwd(&["home"]).success());
     }
 }
