@@ -17,7 +17,7 @@ pub fn basename(args: &[&str]) -> ExitStatus {
 }
 
 fn basename_one(path: &str) -> Result<String, String> {
-    if !path.contains("/") {
+    if !path.contains('/') {
         Ok(String::from(path))
     } else {
         match Path::new(path)
@@ -25,8 +25,8 @@ fn basename_one(path: &str) -> Result<String, String> {
             .map(|x| x.to_str())
             .map(|x| x.unwrap())
         {
-            Some(x) => Ok(format!("{}", x)),
-            None => Err(format!("{} has no basename\n", path).into()),
+            Some(x) => Ok(x.to_string()),
+            None => Err(format!("{} has no basename\n", path)),
         }
     }
 }

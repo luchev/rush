@@ -17,12 +17,12 @@ pub fn dirname(args: &[&str]) -> ExitStatus {
 }
 
 fn dirname_one(path: &str) -> Result<String, String> {
-    if !path.contains("/") {
+    if !path.contains('/') {
         Ok(String::from("."))
     } else {
         match Path::new(path).parent().map(|x| x.as_os_str()).map(|x| x.to_str()).map(|x| x.unwrap()) {
-            Some(x) => Ok(format!("{}", x)),
-            None => Err(format!("{} has no parent directory\n", path).into()),
+            Some(x) => Ok(x.to_string()),
+            None => Err(format!("{} has no parent directory\n", path)),
         }
     }
 }

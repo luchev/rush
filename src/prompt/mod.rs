@@ -7,7 +7,7 @@ use std::io::Write;
 
 pub enum Result {
     Commands(Vec<TopLevelCommand<String>>),
-    EOF,
+    Eof,
     Error(ParseError::<String>),
 }
 
@@ -51,7 +51,7 @@ impl Prompt {
         let mut state = Result::Error(ParseError::Custom("".to_string()));
         while let Result::Error(_) = state {
             state = match stdin.read_line(&mut line) {
-                Ok(0) => return Result::EOF,
+                Ok(0) => return Result::Eof,
                 Err(x) => Result::Error(ParseError::Custom(x.to_string())),
                 _ => {
                     let lexer = Lexer::new(line.chars());

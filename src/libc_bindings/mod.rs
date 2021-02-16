@@ -1,4 +1,3 @@
-use libc;
 use std::ffi::{CString, CStr};
 
 pub fn user_home_dir_by_user_name(name: &str) -> Result<String, String> {
@@ -17,6 +16,6 @@ pub fn user_home_dir_by_user_name(name: &str) -> Result<String, String> {
             }
         };
 
-        return Ok(name);
-    };
+        Ok(name)
+    }
 }

@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
 mod globals;
-use serde_yaml;
 use std::fs::OpenOptions;
 
 #[derive(Default, Debug, PartialEq, Serialize, Deserialize)]
@@ -74,9 +73,8 @@ impl Config {
             .open(&config_file_path);
         match file {
             Ok(x) => {
-                match serde_yaml::to_writer(&x, &self) {
-                    Err(x) => eprintln!("Failed to serialize config. Reason: {}", x),
-                    _ => (),
+                if let Err(x) = serde_yaml::to_writer(&x, &self) {
+                    eprintln!("Failed to serialize config. Reason: {}", x);
                 }
             },
             Err(x) => eprintln!("Failed to create config file under {}. Reason: {}", config_file_path, x),
@@ -91,7 +89,6 @@ impl Config {
 
 #[test]
 fn test_serialize_deserialize() {
-    use serde_yaml;
     use std::fs::{remove_file, OpenOptions};
     use std::io::Seek;
     use std::io::SeekFrom;
@@ -115,7 +112,6 @@ fn test_serialize_deserialize() {
 
 #[test]
 fn test_config() {
-    use serde_yaml;
     use std::fs::OpenOptions;
 
     let test_config_file_path = "config_test.yaml";

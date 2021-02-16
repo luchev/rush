@@ -16,7 +16,7 @@ fn main() {
                 let _ = execute(x);
             }
             prompt::Result::Error(x) => println!("{}", x),
-            prompt::Result::EOF => process::exit(0),
+            prompt::Result::Eof => process::exit(0),
         }
     }
 }

@@ -4,7 +4,7 @@ use std::process::ExitStatus;
 
 /// Return directory portion of pathname
 pub fn pwd(args: &[&str]) -> ExitStatus {
-    if args.len() > 0 {
+    if !args.is_empty() {
         eprintln!("Too many arguments");
         ExitStatusExt::from_raw(1)
     } else {

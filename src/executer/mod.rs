@@ -20,7 +20,7 @@ lazy_static! {
 pub fn execute(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus, String> {
     commands
         .into_iter()
-        .map(|x| execute_toplevelcommand(x))
+        .map(execute_toplevelcommand)
         .last()
         .unwrap()
 }
@@ -41,11 +41,14 @@ fn execute_toplevelcommand(command: TopLevelCommand<String>) -> Result<ExitStatu
                     },
                     _ => return Err("Unsupported Redirect".to_string()),
                 }
-                if command == "" {
+                if command.is_empty() {
                     command = args.pop().unwrap();
                 }
             }
-            match execute_single(command.as_ref(), &args.iter().map(|x| x as &str).collect::<Vec<&str>>()) {
+            match execute_single(
+                command.as_ref(),
+                &args.iter().map(|x| x as &str).collect::<Vec<&str>>(),
+            ) {
                 Ok(x) => println!("Exit code {}", x),
                 Err(x) => eprintln!("{}", x),
             }
@@ -59,7 +62,7 @@ fn execute_toplevelcommand(command: TopLevelCommand<String>) -> Result<ExitStatu
 }
 
 fn execute_single(command: &str, args: &[&str]) -> Result<ExitStatus, String> {
-    if let Ok(execution_result) = execute_internal(command.as_ref(), args) {
+    if let Ok(execution_result) = execute_internal(command, args) {
         Ok(execution_result)
     } else {
         use std::process::Command;
@@ -72,9 +75,7 @@ fn execute_single(command: &str, args: &[&str]) -> Result<ExitStatus, String> {
 
 fn execute_internal<'a>(command: &'a str, args: &[&str]) -> Result<ExitStatus, &'static str> {
     match UTIL_COMMANDS.get(command) {
-        Some(util_function) => {
-            Ok(util_function(args))
-        }
+        Some(util_function) => Ok(util_function(args)),
         None => Err("Not an internal command"),
     }
 }

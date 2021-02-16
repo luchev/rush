@@ -12,7 +12,7 @@ pub fn cd(args: &[&str]) -> ExitStatus {
     }
 
     let next_dir;
-    if args.len() == 0 || args.len() == 1 && args[0] == "~" {
+    if args.is_empty() || args.len() == 1 && args[0] == "~" {
         next_dir = match env::var("HOME") {
             Ok(x) => x,
             Err(_) => {
@@ -28,7 +28,7 @@ pub fn cd(args: &[&str]) -> ExitStatus {
                 return ExitStatusExt::from_raw(3);
             },
         }
-    } else if args[0].chars().next() == Some('~') {
+    } else if args[0].starts_with('~') {
         let home_dir = user_home_dir_by_user_name(&args[0][1..]);
         match home_dir {
             Ok(x) => next_dir = x,
