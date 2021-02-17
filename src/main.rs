@@ -13,7 +13,11 @@ fn main() {
     loop {
         match conf.prompt.next() {
             prompt::Result::Commands(x) => {
-                let _ = execute(x);
+                let status = execute(x);
+                match status {
+                    Ok(x) => println!("{}", x),
+                    Err(x) => eprintln!("{}", x),
+                }
             }
             prompt::Result::Error(x) => println!("{}", x),
             prompt::Result::Eof => process::exit(0),
