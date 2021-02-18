@@ -13,6 +13,8 @@ lazy_static! {
         map.insert("basename", util::basename::basename);
         map.insert("dirname", util::dirname::dirname);
         map.insert("pwd", util::pwd::pwd);
+        map.insert("exit", util::exit::exit);
+        map.insert("exec", util::exec::exec);
         map
     };
 }
@@ -99,21 +101,36 @@ fn execute_toplevel_command(command: TopLevelCommand<String>) -> Result<ExitStat
 
 fn execute_list(command: ListCommand) -> Result<ExitStatus, &'static str> {
     let AndOrList { first, rest } = command;
-    let mut status = execute_listable(first)?;
+    let mut status = execute_listable(first);
 
     if rest.is_empty() {
-        return Ok(status)
+        return status
     }
 
     for command in rest {
-        match (command, status.success()) {
-            (AndOr::And(command), true) => status = execute_listable(command)?,
-            (AndOr::Or(command), false) => status = execute_listable(command)?,
+        match (command, status) {
+            (AndOr::And(command), Ok(exit_status)) => {
+                if exit_status.success() {
+                    status = execute_listable(command);
+                } else {
+                    break;
+                }
+            },
+            (AndOr::Or(command), Ok(exit_status)) => {
+                if !exit_status.success() {
+                    status = execute_listable(command);
+                } else {
+                    break;
+                }
+            },
+            (AndOr::Or(command), Err(_)) => {
+                status = execute_listable(command);
+            },
             _ => break,
         };
     }
 
-    Ok(status)
+    status
 }
 
 fn execute_listable(command: ListableCommand<PipeCommand>) -> Result<ExitStatus, &'static str> {
