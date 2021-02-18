@@ -17,21 +17,19 @@ lazy_static! {
     };
 }
 
-type PipeCommand = Vec<
-    PipeableCommand<
-        String,
-        Box<SimpleCommand<String, TopLevelWord<String>, Redirect<TopLevelWord<String>>>>,
-        Box<
-            CompoundCommand<
-                CompoundCommandKind<String, TopLevelWord<String>, TopLevelCommand<String>>,
-                Redirect<TopLevelWord<String>>,
-            >,
+type PipeCommand = PipeableCommand<
+    String,
+    Box<SimpleCommand<String, TopLevelWord<String>, Redirect<TopLevelWord<String>>>>,
+    Box<
+        CompoundCommand<
+            CompoundCommandKind<String, TopLevelWord<String>, TopLevelCommand<String>>,
+            Redirect<TopLevelWord<String>>,
         >,
-        Rc<
-            CompoundCommand<
-                CompoundCommandKind<String, TopLevelWord<String>, TopLevelCommand<String>>,
-                Redirect<TopLevelWord<String>>,
-            >,
+    >,
+    Rc<
+        CompoundCommand<
+            CompoundCommandKind<String, TopLevelWord<String>, TopLevelCommand<String>>,
+            Redirect<TopLevelWord<String>>,
         >,
     >,
 >;
@@ -89,11 +87,7 @@ impl<'a> Executable<'a> {
 }
 
 pub fn execute(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus, &'static str> {
-    commands
-        .into_iter()
-        .map(execute_toplevel_command)
-        .last()
-        .unwrap()
+    commands.into_iter().map(execute_toplevel_command).last().unwrap_or(Err("No commands to execute"))
 }
 
 fn execute_toplevel_command(command: TopLevelCommand<String>) -> Result<ExitStatus, &'static str> {
@@ -105,7 +99,25 @@ fn execute_toplevel_command(command: TopLevelCommand<String>) -> Result<ExitStat
 
 fn execute_list(command: ListCommand) -> Result<ExitStatus, &'static str> {
     let AndOrList { first, rest } = command;
-    match first {
+    let mut status = execute_listable(first)?;
+
+    if rest.is_empty() {
+        return Ok(status)
+    }
+
+    for command in rest {
+        match (command, status.success()) {
+            (AndOr::And(command), true) => status = execute_listable(command)?,
+            (AndOr::Or(command), false) => status = execute_listable(command)?,
+            _ => break,
+        };
+    }
+
+    Ok(status)
+}
+
+fn execute_listable(command: ListableCommand<PipeCommand>) -> Result<ExitStatus, &'static str> {
+    match command {
         ListableCommand::Pipe(negate_last, command) => {
             let status = execute_pipe(command)?;
             if negate_last {
@@ -122,9 +134,7 @@ fn execute_list(command: ListCommand) -> Result<ExitStatus, &'static str> {
     }
 }
 
-fn execute_pipe(command: PipeCommand) -> Result<ExitStatus, &'static str> {
-    eprintln!("{:?}", command);
-
+fn execute_pipe(_command: Vec<PipeCommand>) -> Result<ExitStatus, &'static str> {
     Err("Unsupported: Pipe")
 }
 
