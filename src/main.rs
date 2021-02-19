@@ -18,7 +18,7 @@ fn main() {
             prompt::Result::Commands(x) => {
                 let status = execute(x);
                 if let Err(x) = status {
-                    eprintln!("{}", x)
+                    eprintln!("Prompt error: {}", x)
                 }
             }
             prompt::Result::Error(x) => println!("{}", x),

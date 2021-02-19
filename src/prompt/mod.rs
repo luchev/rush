@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::io;
 use std::io::Write;
 
+#[derive(Debug)]
 pub enum Result {
     Commands(Vec<TopLevelCommand<String>>),
     Eof,
@@ -54,13 +55,18 @@ impl Prompt {
                 Ok(0) => return Result::Eof,
                 Err(x) => Result::Error(ParseError::Custom(x.to_string())),
                 _ => {
-                    let lexer = Lexer::new(line.chars());
-                    match DefaultParser::new(lexer).into_iter().collect::<std::result::Result<Vec<TopLevelCommand<String>>, _>>() {
-                        Ok(x) => Result::Commands(x),
-                        Err(x) => Result::Error(ParseError::Custom(x.to_string())),
+                    if line.len() >= 2 && &line[line.len()-2..] == "\\\n" {
+                        line = String::from(&line[..line.len()-2]);
+                        Result::Error(ParseError::Custom("".to_string()))
+                    } else {
+                        let lexer = Lexer::new(line.chars());
+                        match DefaultParser::new(lexer).into_iter().collect::<std::result::Result<Vec<TopLevelCommand<String>>, _>>() {
+                            Ok(x) => Result::Commands(x),
+                            Err(x) => Result::Error(ParseError::Custom(x.to_string())),
+                        }
                     }
                 }
-            }
+            };
         }
 
         state
