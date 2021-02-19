@@ -1,10 +1,13 @@
 use crate::util;
 use conch_parser::ast::*;
 use lazy_static::lazy_static;
-use std::collections::HashMap;
-use std::os::unix::process::ExitStatusExt;
-use std::process::ExitStatus;
-use std::rc::Rc;
+use std::{
+    collections::HashMap,
+    os::unix::process::ExitStatusExt,
+    process::{Child, ExitStatus},
+    rc::Rc,
+    sync::{Arc, Mutex},
+};
 
 lazy_static! {
     static ref UTIL_COMMANDS: HashMap::<&'static str, fn(&[&str]) -> ExitStatus> = {
@@ -17,6 +20,7 @@ lazy_static! {
         map.insert("exec", util::exec::exec);
         map
     };
+    pub static ref CURRENT_CHILD: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
 }
 
 type PipeCommand = PipeableCommand<
@@ -89,7 +93,11 @@ impl<'a> Executable<'a> {
 }
 
 pub fn execute(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus, &'static str> {
-    commands.into_iter().map(execute_toplevel_command).last().unwrap_or(Err("No commands to execute"))
+    commands
+        .into_iter()
+        .map(execute_toplevel_command)
+        .last()
+        .unwrap_or(Err(""))
 }
 
 fn execute_toplevel_command(command: TopLevelCommand<String>) -> Result<ExitStatus, &'static str> {
@@ -104,7 +112,7 @@ fn execute_list(command: ListCommand) -> Result<ExitStatus, &'static str> {
     let mut status = execute_listable(first);
 
     if rest.is_empty() {
-        return status
+        return status;
     }
 
     for command in rest {
@@ -115,17 +123,17 @@ fn execute_list(command: ListCommand) -> Result<ExitStatus, &'static str> {
                 } else {
                     break;
                 }
-            },
+            }
             (AndOr::Or(command), Ok(exit_status)) => {
                 if !exit_status.success() {
                     status = execute_listable(command);
                 } else {
                     break;
                 }
-            },
+            }
             (AndOr::Or(command), Err(_)) => {
                 status = execute_listable(command);
-            },
+            }
             _ => break,
         };
     }
@@ -230,14 +238,24 @@ fn run(executable: Executable) -> Result<ExitStatus, &'static str> {
         Ok(execution_result)
     } else {
         use std::process::Command;
+
         match Command::new(executable.command)
             .args(executable.args)
-            .status()
+            .spawn()
         {
-            Ok(x) => Ok(x),
+            Ok(x) => {
+                *CURRENT_CHILD.lock().unwrap() = Some(x);
+                match CURRENT_CHILD.lock().unwrap().as_mut().unwrap().wait() {
+                    Ok(x) => Ok(x),
+                    Err(x) => {
+                        eprintln!("{}", x);
+                        Err("IO Error.")
+                    }
+                }
+            }
             Err(x) => {
                 eprintln!("{}", x);
-                Err("IO Error.")
+                Err("Failed to spawn")
             }
         }
     }
