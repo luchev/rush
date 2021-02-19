@@ -1,6 +1,6 @@
 pub mod basename;
-pub mod dirname;
-pub mod pwd;
 pub mod cd;
-pub mod exit;
+pub mod dirname;
 pub mod exec;
+pub mod exit;
+pub mod pwd;

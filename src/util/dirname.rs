@@ -1,6 +1,4 @@
-use std::os::unix::process::ExitStatusExt;
-use std::path::Path;
-use std::process::ExitStatus;
+use std::{os::unix::process::ExitStatusExt, path::Path, process::ExitStatus};
 
 /// Return directory portion of pathname
 pub fn dirname(args: &[&str]) -> ExitStatus {
@@ -20,7 +18,12 @@ fn dirname_one(path: &str) -> Result<String, String> {
     if !path.contains('/') {
         Ok(String::from("."))
     } else {
-        match Path::new(path).parent().map(|x| x.as_os_str()).map(|x| x.to_str()).map(|x| x.unwrap()) {
+        match Path::new(path)
+            .parent()
+            .map(|x| x.as_os_str())
+            .map(|x| x.to_str())
+            .map(|x| x.unwrap())
+        {
             Some(x) => Ok(x.to_string()),
             None => Err(format!("{} has no parent directory\n", path)),
         }
@@ -29,8 +32,8 @@ fn dirname_one(path: &str) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::{assert_eq};
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_dirname_one() {

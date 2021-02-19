@@ -1,6 +1,4 @@
-use std::env;
-use std::os::unix::process::ExitStatusExt;
-use std::process::ExitStatus;
+use std::{env, os::unix::process::ExitStatusExt, process::ExitStatus};
 
 /// Return directory portion of pathname
 pub fn pwd(args: &[&str]) -> ExitStatus {
@@ -12,11 +10,11 @@ pub fn pwd(args: &[&str]) -> ExitStatus {
             Ok(x) => {
                 println!("{}", x.into_os_string().to_str().unwrap());
                 ExitStatusExt::from_raw(0)
-            },
+            }
             Err(x) => {
                 eprintln!("{}", x);
                 ExitStatusExt::from_raw(2)
-            },
+            }
         }
     }
 }
@@ -32,7 +30,7 @@ mod tests {
 
         let _ = env::set_current_dir("/usr");
         assert!(pwd(&[]).success());
-        
+
         assert!(!pwd(&["home"]).success());
     }
 }

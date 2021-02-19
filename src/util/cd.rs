@@ -1,8 +1,6 @@
 // cd ~username will put you in username's home directory.
-use std::env;
 use crate::libc_bindings::user_home_dir_by_user_name;
-use std::os::unix::process::ExitStatusExt;
-use std::process::ExitStatus;
+use std::{env, os::unix::process::ExitStatusExt, process::ExitStatus};
 
 /// Return directory portion of pathname
 pub fn cd(args: &[&str]) -> ExitStatus {
@@ -18,7 +16,7 @@ pub fn cd(args: &[&str]) -> ExitStatus {
             Err(_) => {
                 eprintln!("Can't find HOME in ENV");
                 return ExitStatusExt::from_raw(2);
-            },
+            }
         }
     } else if args[0] == "-" {
         next_dir = match env::var("OLDPWD") {
@@ -26,7 +24,7 @@ pub fn cd(args: &[&str]) -> ExitStatus {
             Err(_) => {
                 eprintln!("Can't find OLDPWD in ENV");
                 return ExitStatusExt::from_raw(3);
-            },
+            }
         }
     } else if args[0].starts_with('~') {
         let home_dir = user_home_dir_by_user_name(&args[0][1..]);
@@ -35,7 +33,7 @@ pub fn cd(args: &[&str]) -> ExitStatus {
             Err(_) => {
                 eprintln!("Couldn't find home dir for user {}", &args[0][1..]);
                 return ExitStatusExt::from_raw(4);
-            },
+            }
         }
     } else {
         next_dir = args[0].into();
@@ -47,49 +45,52 @@ pub fn cd(args: &[&str]) -> ExitStatus {
             env::set_var("OLDPWD", old_pwd);
             env::set_var("PWD", env::current_dir().unwrap_or_default());
             ExitStatusExt::from_raw(0)
-        },
+        }
         Err(x) => {
             eprintln!("{}\n", x);
             ExitStatusExt::from_raw(5)
-        },
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::{assert_eq};
-    use std::ffi::OsString;
     use super::*;
+    use pretty_assertions::assert_eq;
+    use std::ffi::OsString;
 
     #[test]
     fn test_cd_home() {
         let _ = env::set_current_dir("/");
         assert_eq!("/", env::current_dir().unwrap().into_os_string());
-        
+
         // cd
         let _ = env::set_var("HOME", "/etc");
         let _ = cd(&[]);
         assert_eq!("/etc", env::current_dir().unwrap().into_os_string());
-        
+
         // cd ~
         let _ = env::set_var("HOME", "/");
         let _ = cd(&["~"]);
         assert_eq!("/", env::current_dir().unwrap().into_os_string());
-        
+
         // cd ~user
         if let Ok(user) = env::var("USER") {
             let _ = cd(&["/etc"]);
             let _ = cd(&[&format!("~{}", user)]);
             let home = user_home_dir_by_user_name(&user).unwrap_or_default();
-            assert_eq!(OsString::from(home), env::current_dir().unwrap().into_os_string());
+            assert_eq!(
+                OsString::from(home),
+                env::current_dir().unwrap().into_os_string()
+            );
         }
     }
-    
+
     #[test]
     fn test_cd_parent_dir() {
         let _ = env::set_current_dir("/");
         assert_eq!("/", env::current_dir().unwrap().into_os_string());
-        
+
         // cd ..
         let _ = env::set_current_dir("/etc");
         let _ = cd(&[".."]);
@@ -100,12 +101,12 @@ mod tests {
         let _ = cd(&["../.."]);
         assert_eq!("/", env::current_dir().unwrap().into_os_string());
     }
-    
+
     #[test]
     fn test_cd_previous_dir() {
         let _ = env::set_current_dir("/");
         assert_eq!("/", env::current_dir().unwrap().into_os_string());
-        
+
         // cd -
         let _ = env::set_current_dir("/etc");
         let _ = cd(&[".."]);
@@ -115,7 +116,7 @@ mod tests {
         let _ = cd(&["-"]);
         assert_eq!("/", env::current_dir().unwrap().into_os_string());
     }
-    
+
     #[test]
     fn test_cd_absolute_path() {
         let _ = env::set_current_dir("/");

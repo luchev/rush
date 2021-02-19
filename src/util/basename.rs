@@ -1,6 +1,4 @@
-use std::os::unix::process::ExitStatusExt;
-use std::path::Path;
-use std::process::ExitStatus;
+use std::{os::unix::process::ExitStatusExt, path::Path, process::ExitStatus};
 
 /// Return non-directory portion of pathname
 pub fn basename(args: &[&str]) -> ExitStatus {

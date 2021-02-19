@@ -1,5 +1,7 @@
-use std::os::unix::process::{ExitStatusExt, CommandExt};
-use std::process::ExitStatus;
+use std::{
+    os::unix::process::{CommandExt, ExitStatusExt},
+    process::ExitStatus,
+};
 
 /// Exit with an exit code
 pub fn exec(args: &[&str]) -> ExitStatus {
@@ -14,8 +16,8 @@ pub fn exec(args: &[&str]) -> ExitStatus {
 
 #[cfg(test)]
 mod tests {
-    use pretty_assertions::{assert_eq};
     use super::*;
+    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_exec_err() {
