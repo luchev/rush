@@ -166,8 +166,71 @@ fn execute_pipe(_command: Vec<PipeCommand>) -> Result<ExitStatus, &'static str> 
 fn execute_single(command: SingleCommand) -> Result<ExitStatus, &'static str> {
     match command {
         PipeableCommand::Simple(command) => execute_simple(command),
-        PipeableCommand::Compound(_command) => Err("Unsupported: Compound command"),
+        PipeableCommand::Compound(command) => {
+            if !command.io.is_empty() {
+                return Err("Unimplemented: Compound> command io");
+            }
+
+            match command.kind {
+                CompoundCommandKind::Subshell(commands) => execute_subshell(commands),
+                CompoundCommandKind::Brace(_commands) => Err("Unsupported: Compound command Brace"),
+                CompoundCommandKind::While(_guard_body_pair) => {
+                    Err("Unsupported: Compound command While")
+                }
+                CompoundCommandKind::Until(_guard_body_pair) => {
+                    Err("Unsupported: Compound command Until")
+                }
+                CompoundCommandKind::If {
+                    conditionals: _,
+                    else_branch: _,
+                } => Err("Unsupported: Compound command If"),
+                CompoundCommandKind::For {
+                    var: _,
+                    words: _,
+                    body: _,
+                } => Err("Unsupported: Compound command For"),
+                CompoundCommandKind::Case { word: _, arms: _ } => {
+                    Err("Unsupported: Compound command Case")
+                }
+            }
+        }
         PipeableCommand::FunctionDef(_name, _body) => Err("Unsupported: Function definition"),
+    }
+}
+
+fn execute_subshell(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus, &'static str> {
+    use nix::{
+        sys::wait::{wait,WaitStatus},
+        unistd::{
+            fork,
+            ForkResult::{Child, Parent},
+        },
+    };
+
+    unsafe {
+        let pid = fork();
+        match pid.expect("Fork Failed: Unable to create child process!") {
+            Child => {
+                match execute(commands) {
+                    Ok(status) => std::process::exit(status.code().unwrap_or(1)),
+                    Err(x) => {
+                        eprintln!("Error in subshell: {}", x);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            Parent { child: _ } => {
+                match wait() {
+                    Ok(WaitStatus::Exited(_, status)) => {
+                        Ok(ExitStatusExt::from_raw(status))
+                    },
+                    err => {
+                        eprintln!("Error with subshell execution: {:?}", err);
+                        Err("Failed to execute subshell")
+                    }
+                }
+            }
+        }
     }
 }
 
