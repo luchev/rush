@@ -1,27 +1,6 @@
-use crate::util;
 use conch_parser::ast::*;
-use lazy_static::lazy_static;
-use std::{
-    collections::HashMap,
-    os::unix::process::ExitStatusExt,
-    process::{Child, ExitStatus},
-    rc::Rc,
-    sync::{Arc, Mutex},
-};
-
-lazy_static! {
-    static ref UTIL_COMMANDS: HashMap::<&'static str, fn(&[&str]) -> ExitStatus> = {
-        let mut map = HashMap::<&'static str, fn(&[&str]) -> ExitStatus>::new();
-        map.insert("cd", util::cd::cd);
-        map.insert("basename", util::basename::basename);
-        map.insert("dirname", util::dirname::dirname);
-        map.insert("pwd", util::pwd::pwd);
-        map.insert("exit", util::exit::exit);
-        map.insert("exec", util::exec::exec);
-        map
-    };
-    pub static ref CURRENT_CHILD: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
-}
+use std::{os::unix::process::ExitStatusExt, process::ExitStatus, rc::Rc};
+use crate::globals::{CURRENT_CHILD, UTIL_COMMANDS};
 
 type PipeCommand = PipeableCommand<
     String,
@@ -200,7 +179,7 @@ fn execute_single(command: SingleCommand) -> Result<ExitStatus, &'static str> {
 
 fn execute_subshell(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus, &'static str> {
     use nix::{
-        sys::wait::{wait,WaitStatus},
+        sys::wait::{wait, WaitStatus},
         unistd::{
             fork,
             ForkResult::{Child, Parent},
@@ -210,26 +189,20 @@ fn execute_subshell(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus
     unsafe {
         let pid = fork();
         match pid.expect("Fork Failed: Unable to create child process!") {
-            Child => {
-                match execute(commands) {
-                    Ok(status) => std::process::exit(status.code().unwrap_or(1)),
-                    Err(x) => {
-                        eprintln!("Error in subshell: {}", x);
-                        std::process::exit(1);
-                    }
+            Child => match execute(commands) {
+                Ok(status) => std::process::exit(status.code().unwrap_or(1)),
+                Err(x) => {
+                    eprintln!("Error in subshell: {}", x);
+                    std::process::exit(1);
                 }
-            }
-            Parent { child: _ } => {
-                match wait() {
-                    Ok(WaitStatus::Exited(_, status)) => {
-                        Ok(ExitStatusExt::from_raw(status))
-                    },
-                    err => {
-                        eprintln!("Error with subshell execution: {:?}", err);
-                        Err("Failed to execute subshell")
-                    }
+            },
+            Parent { child: _ } => match wait() {
+                Ok(WaitStatus::Exited(_, status)) => Ok(ExitStatusExt::from_raw(status)),
+                err => {
+                    eprintln!("Error with subshell execution: {:?}", err);
+                    Err("Failed to execute subshell")
                 }
-            }
+            },
         }
     }
 }
@@ -271,7 +244,7 @@ fn execute_simple(
                             return Err("Unsupported: *");
                         }
                         SimpleWord::Subst(_x) => {
-                            return Err("Unsupported: *");
+                            return Err("Unsupported: substring");
                         }
                         SimpleWord::Tilde => {
                             return Err("Unsupported: ~");

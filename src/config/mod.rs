@@ -2,7 +2,6 @@ use crate::prompt::Prompt;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::env;
-mod globals;
 use std::fs::OpenOptions;
 
 #[derive(Default, Debug, PartialEq, Serialize, Deserialize)]
@@ -31,7 +30,7 @@ impl Config {
             }
         };
 
-        let config_file_path = format!("{}/{}", home, globals::CONF_FILE_NAME);
+        let config_file_path = format!("{}/{}", home, crate::globals::CONF_FILE_NAME);
 
         let file = OpenOptions::new()
             .write(false)
@@ -64,7 +63,7 @@ impl Config {
             }
         };
 
-        let config_file_path = format!("{}/{}", home, globals::CONF_FILE_NAME);
+        let config_file_path = format!("{}/{}", home, crate::globals::CONF_FILE_NAME);
 
         let file = OpenOptions::new()
             .write(true)
@@ -76,8 +75,11 @@ impl Config {
                 if let Err(x) = serde_yaml::to_writer(&x, &self) {
                     eprintln!("Failed to serialize config. Reason: {}", x);
                 }
-            },
-            Err(x) => eprintln!("Failed to create config file under {}. Reason: {}", config_file_path, x),
+            }
+            Err(x) => eprintln!(
+                "Failed to create config file under {}. Reason: {}",
+                config_file_path, x
+            ),
         }
     }
 

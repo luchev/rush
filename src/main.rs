@@ -4,6 +4,7 @@ mod libc_bindings;
 mod prompt;
 mod signals;
 mod util;
+mod globals;
 use crate::{config::Config, executer::execute};
 use std::process;
 
