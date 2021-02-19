@@ -138,7 +138,14 @@ fn execute_listable(command: ListableCommand<PipeCommand>) -> Result<ExitStatus,
     }
 }
 
-fn execute_pipe(_command: Vec<PipeCommand>) -> Result<ExitStatus, &'static str> {
+fn execute_pipe(commands: Vec<PipeCommand>) -> Result<ExitStatus, &'static str> {
+    if commands.is_empty() {
+        return Err("Invalid empty pipe command");
+    }
+    if commands.len() == 1 {
+        return execute_single(commands.into_iter().next().unwrap());
+    }
+
     Err("Unsupported: Pipe")
 }
 
