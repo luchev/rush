@@ -12,6 +12,7 @@ libc = "0.2.81"
 nix = "0.19.1"
 regex = "1.4.2"
 ringbuf = "0.2.2"
+rustyline = "7.1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_yaml = "0.8.15"
 signal-hook = "0.3.4"

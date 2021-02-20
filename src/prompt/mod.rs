@@ -1,15 +1,17 @@
-use conch_parser::ast::TopLevelCommand;
-use conch_parser::lexer::Lexer;
-use conch_parser::parse::{DefaultParser, ParseError};
+use conch_parser::{
+    ast::TopLevelCommand,
+    lexer::Lexer,
+    parse::{DefaultParser, ParseError},
+};
+use rustyline::{error::ReadlineError};
 use serde::{Deserialize, Serialize};
-use std::io;
-use std::io::Write;
 
 #[derive(Debug)]
 pub enum PromptResult {
     Commands(Vec<TopLevelCommand<String>>),
     Eof,
-    Error(ParseError::<String>),
+    Interrupt,
+    Error(ParseError<String>),
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -42,33 +44,41 @@ impl Default for Prompt {
 }
 
 impl Prompt {
-    pub fn next(&self) -> PromptResult {
-        let stdin = io::stdin();
-        let mut stdout = io::stdout();
+    pub fn next(&self, rl: &mut rustyline::Editor<()>) -> PromptResult {
         let mut line = String::new();
 
-        let _ = stdout.write(self.ps1.as_bytes());
-        let _ = stdout.flush();
-        let mut state = PromptResult::Error(ParseError::Custom("".to_string()));
-        while let PromptResult::Error(_) = state {
-            state = match stdin.read_line(&mut line) {
-                Ok(0) => return PromptResult::Eof,
-                Err(x) => PromptResult::Error(ParseError::Custom(x.to_string())),
-                _ => {
-                    if line.len() >= 2 && &line[line.len()-2..] == "\\\n" {
-                        line = String::from(&line[..line.len()-2]);
+        loop {
+            match rl.readline(self.ps1.as_ref()) {
+                Ok(input) => {
+                    line.push_str(input.as_ref());
+                    if line.len() >= 2 && &line[line.len() - 1..] == "\\" {
+                        line = String::from(&line[..line.len() - 1]);
                         PromptResult::Error(ParseError::Custom("".to_string()))
                     } else {
                         let lexer = Lexer::new(line.chars());
-                        match DefaultParser::new(lexer).into_iter().collect::<std::result::Result<Vec<TopLevelCommand<String>>, _>>() {
-                            Ok(x) => PromptResult::Commands(x),
+                        match DefaultParser::new(lexer)
+                            .into_iter()
+                            .collect::<std::result::Result<Vec<TopLevelCommand<String>>, _>>()
+                        {
+                            Ok(x) => {
+                                rl.add_history_entry(line.clone());
+                                return PromptResult::Commands(x)
+                            },
                             Err(x) => PromptResult::Error(ParseError::Custom(x.to_string())),
                         }
                     }
                 }
+                Err(ReadlineError::Interrupted) => {
+                    return PromptResult::Interrupt;
+                }
+                Err(ReadlineError::Eof) => {
+                    return PromptResult::Eof;
+                }
+                Err(err) => {
+                    println!(": {:?}", err);
+                    return PromptResult::Interrupt;
+                }
             };
         }
-
-        state
     }
 }

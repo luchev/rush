@@ -57,6 +57,15 @@ type SingleCommand = PipeableCommand<
     >,
 >;
 
+#[derive(Debug)]
+pub enum ExecuteError {
+    StaticError(&'static str),
+    Unsupported(&'static str),
+    IoError(std::io::Error),
+    NotAnInner,
+    Empty,
+}
+
 struct Executable<'a> {
     command: &'a str,
     args: &'a [&'a str],
@@ -89,19 +98,19 @@ impl Redirects {
         match redirect {
             Redirect::Read(from, to) => match parse_toplevel_word(to) {
                 Ok(path) => self.write.push((from.unwrap_or(globals::STDIN), path)),
-                Err(err) => eprintln!("Error parsing redirect: {}", err),
+                Err(err) => eprintln!("Error parsing redirect: {:?}", err),
             },
             Redirect::Write(from, to) => match parse_toplevel_word(to) {
                 Ok(path) => self.write.push((from.unwrap_or(globals::STDOUT), path)),
-                Err(err) => eprintln!("Error parsing redirect: {}", err),
+                Err(err) => eprintln!("Error parsing redirect: {:?}", err),
             },
             Redirect::ReadWrite(from, to) => match parse_toplevel_word(to) {
                 Ok(path) => self.write.push((from.unwrap_or(globals::STDIN), path)),
-                Err(err) => eprintln!("Error parsing redirect: {}", err),
+                Err(err) => eprintln!("Error parsing redirect: {:?}", err),
             },
             Redirect::Append(from, to) => match parse_toplevel_word(to) {
                 Ok(path) => self.write.push((from.unwrap_or(globals::STDOUT), path)),
-                Err(err) => eprintln!("Error parsing redirect: {}", err),
+                Err(err) => eprintln!("Error parsing redirect: {:?}", err),
             },
             Redirect::Clobber(_, _toplevel_word) => {
                 eprintln!("Unsupported: Clobber");
@@ -119,46 +128,45 @@ impl Redirects {
     }
 }
 
-fn parse_toplevel_word(word: &TopLevelWord<String>) -> Result<String, &'static str> {
+fn parse_toplevel_word(word: &TopLevelWord<String>) -> Result<String, ExecuteError> {
     match word {
         TopLevelWord(word) => match word {
             ComplexWord::Single(word) => match word {
                 Word::Simple(word) => match word {
                     SimpleWord::Literal(x) => Ok(x.to_string()),
                     SimpleWord::Escaped(x) => Ok(x.to_string()),
-                    SimpleWord::Colon => Err("Unsupported: :"),
-                    SimpleWord::Param(_x) => Err("Unsupported: Params"),
-                    SimpleWord::Question => Err("Unsupported: ?"),
-                    SimpleWord::SquareClose => Err("Unsupported: ["),
-                    SimpleWord::SquareOpen => Err("Unsupported: ]"),
-                    SimpleWord::Star => Err("Unsupported: *"),
-                    SimpleWord::Subst(_x) => Err("Unsupported: substring"),
-                    SimpleWord::Tilde => Err("Unsupported: ~"),
+                    SimpleWord::Colon => Err(ExecuteError::Unsupported(":")),
+                    SimpleWord::Param(_x) => Err(ExecuteError::Unsupported("Params")),
+                    SimpleWord::Question => Err(ExecuteError::Unsupported("?")),
+                    SimpleWord::SquareClose => Err(ExecuteError::Unsupported("[")),
+                    SimpleWord::SquareOpen => Err(ExecuteError::Unsupported("]")),
+                    SimpleWord::Star => Err(ExecuteError::Unsupported("*")),
+                    SimpleWord::Subst(_x) => Err(ExecuteError::Unsupported("substring")),
+                    SimpleWord::Tilde => Err(ExecuteError::Unsupported("~")),
                 },
                 Word::SingleQuoted(word) => Ok(word.to_string()),
-                Word::DoubleQuoted(_word) => Err("Unsupported: DoubleQuoted"),
+                Word::DoubleQuoted(_word) => Err(ExecuteError::StaticError("DoubleQuoted")),
             },
-            ComplexWord::Concat(_word) => Err("Unsupported: Concat word"),
+            ComplexWord::Concat(_word) => Err(ExecuteError::StaticError("Concat word")),
         },
     }
 }
 
-pub fn execute(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus, &'static str> {
+pub fn execute(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus, ExecuteError> {
     commands
         .into_iter()
         .map(execute_toplevel_command)
-        .last()
-        .unwrap_or(Err(""))
+        .last().unwrap_or(Err(ExecuteError::Empty))
 }
 
-fn execute_toplevel_command(command: TopLevelCommand<String>) -> Result<ExitStatus, &'static str> {
+fn execute_toplevel_command(command: TopLevelCommand<String>) -> Result<ExitStatus, ExecuteError> {
     match command {
         TopLevelCommand(Command::List(x)) => execute_list(x),
         TopLevelCommand(Command::Job(x)) => execute_list(x),
     }
 }
 
-fn execute_list(command: ListCommand) -> Result<ExitStatus, &'static str> {
+fn execute_list(command: ListCommand) -> Result<ExitStatus, ExecuteError> {
     let AndOrList { first, rest } = command;
     let mut status = execute_listable(first);
 
@@ -167,7 +175,7 @@ fn execute_list(command: ListCommand) -> Result<ExitStatus, &'static str> {
     }
 
     for command in rest {
-        match (command, status) {
+        match (command, &status) {
             (AndOr::And(command), Ok(exit_status)) => {
                 if exit_status.success() {
                     status = execute_listable(command);
@@ -192,7 +200,7 @@ fn execute_list(command: ListCommand) -> Result<ExitStatus, &'static str> {
     status
 }
 
-fn execute_listable(command: ListableCommand<PipeCommand>) -> Result<ExitStatus, &'static str> {
+fn execute_listable(command: ListableCommand<PipeCommand>) -> Result<ExitStatus, ExecuteError> {
     match command {
         ListableCommand::Pipe(negate_last, command) => {
             let status = execute_pipe(command)?;
@@ -210,53 +218,53 @@ fn execute_listable(command: ListableCommand<PipeCommand>) -> Result<ExitStatus,
     }
 }
 
-fn execute_pipe(commands: Vec<PipeCommand>) -> Result<ExitStatus, &'static str> {
+fn execute_pipe(commands: Vec<PipeCommand>) -> Result<ExitStatus, ExecuteError> {
     if commands.is_empty() {
-        return Err("Invalid empty pipe command");
+        return Err(ExecuteError::StaticError("Invalid empty pipe command"));
     }
     if commands.len() == 1 {
         return execute_single(commands.into_iter().next().unwrap());
     }
 
-    Err("Unsupported: Pipe")
+    Err(ExecuteError::Unsupported("Pipe"))
 }
 
-fn execute_single(command: SingleCommand) -> Result<ExitStatus, &'static str> {
+fn execute_single(command: SingleCommand) -> Result<ExitStatus, ExecuteError> {
     match command {
         PipeableCommand::Simple(command) => execute_simple(command),
         PipeableCommand::Compound(command) => {
             if !command.io.is_empty() {
-                return Err("Unimplemented: Compound> command io");
+                return Err(ExecuteError::Unsupported("Compound> command io"));
             }
 
             match command.kind {
                 CompoundCommandKind::Subshell(commands) => execute_subshell(commands),
-                CompoundCommandKind::Brace(_commands) => Err("Unsupported: Compound command Brace"),
+                CompoundCommandKind::Brace(_commands) => Err(ExecuteError::Unsupported("Compound command Brace")),
                 CompoundCommandKind::While(_guard_body_pair) => {
-                    Err("Unsupported: Compound command While")
+                    Err(ExecuteError::Unsupported("Compound command While"))
                 }
                 CompoundCommandKind::Until(_guard_body_pair) => {
-                    Err("Unsupported: Compound command Until")
+                    Err(ExecuteError::Unsupported("Compound command Until"))
                 }
                 CompoundCommandKind::If {
                     conditionals: _,
                     else_branch: _,
-                } => Err("Unsupported: Compound command If"),
+                } => Err(ExecuteError::Unsupported("Compound command If")),
                 CompoundCommandKind::For {
                     var: _,
                     words: _,
                     body: _,
-                } => Err("Unsupported: Compound command For"),
+                } => Err(ExecuteError::Unsupported("Compound command For")),
                 CompoundCommandKind::Case { word: _, arms: _ } => {
-                    Err("Unsupported: Compound command Case")
+                    Err(ExecuteError::Unsupported("Compound command Case"))
                 }
             }
         }
-        PipeableCommand::FunctionDef(_name, _body) => Err("Unsupported: Function definition"),
+        PipeableCommand::FunctionDef(_name, _body) => Err(ExecuteError::Unsupported("Function definition")),
     }
 }
 
-fn execute_subshell(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus, &'static str> {
+fn execute_subshell(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus, ExecuteError> {
     use nix::{
         sys::wait::{wait, WaitStatus},
         unistd::{
@@ -271,7 +279,7 @@ fn execute_subshell(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus
             Child => match execute(commands) {
                 Ok(status) => std::process::exit(status.code().unwrap_or(1)),
                 Err(x) => {
-                    eprintln!("Error in subshell: {}", x);
+                    eprintln!("Error in subshell: {:?}", x);
                     std::process::exit(1);
                 }
             },
@@ -279,7 +287,7 @@ fn execute_subshell(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus
                 Ok(WaitStatus::Exited(_, status)) => Ok(ExitStatusExt::from_raw(status)),
                 err => {
                     eprintln!("Error with subshell execution: {:?}", err);
-                    Err("Failed to execute subshell")
+                    Err(ExecuteError::StaticError("Failed to execute subshell"))
                 }
             },
         }
@@ -288,13 +296,13 @@ fn execute_subshell(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus
 
 fn execute_simple(
     command: Box<SimpleCommand<String, TopLevelWord<String>, Redirect<TopLevelWord<String>>>>,
-) -> Result<ExitStatus, &'static str> {
+) -> Result<ExitStatus, ExecuteError> {
     let SimpleCommand {
         redirects_or_env_vars,
         redirects_or_cmd_words,
     } = command.as_ref();
     if !redirects_or_env_vars.is_empty() {
-        return Err("Unsupported: environment variables or redirects");
+        return Err(ExecuteError::StaticError("Unsupported: environment variables or redirects"));
     }
 
     let mut args = vec![];
@@ -308,37 +316,37 @@ fn execute_simple(
                         SimpleWord::Literal(x) => args.push(x.as_ref()),
                         SimpleWord::Escaped(x) => args.push(x.as_ref()),
                         SimpleWord::Colon => {
-                            return Err("Unsupported: :");
+                            return Err(ExecuteError::Unsupported(":"));
                         }
                         SimpleWord::Param(_x) => {
-                            return Err("Unsupported: Params");
+                            return Err(ExecuteError::Unsupported("Params"));
                         }
                         SimpleWord::Question => {
-                            return Err("Unsupported: ?");
+                            return Err(ExecuteError::Unsupported("?"));
                         }
                         SimpleWord::SquareClose => {
-                            return Err("Unsupported: [");
+                            return Err(ExecuteError::Unsupported("["));
                         }
                         SimpleWord::SquareOpen => {
-                            return Err("Unsupported: ]");
+                            return Err(ExecuteError::Unsupported("]"));
                         }
                         SimpleWord::Star => {
-                            return Err("Unsupported: *");
+                            return Err(ExecuteError::Unsupported("*"));
                         }
                         SimpleWord::Subst(_x) => {
-                            return Err("Unsupported: substring");
+                            return Err(ExecuteError::Unsupported("substring"));
                         }
                         SimpleWord::Tilde => {
-                            return Err("Unsupported: ~");
+                            return Err(ExecuteError::Unsupported("~"));
                         }
                     },
                     Word::SingleQuoted(word) => args.push(word.as_ref()),
                     Word::DoubleQuoted(_word) => {
-                        return Err("Unsupported: DoubleQuoted");
+                        return Err(ExecuteError::Unsupported("DoubleQuoted"));
                     }
                 },
                 ComplexWord::Concat(_word) => {
-                    return Err("Unsupported: Concat word");
+                    return Err(ExecuteError::Unsupported("Concat word"));
                 }
             },
             RedirectOrCmdWord::Redirect(redirect) => {
@@ -351,7 +359,7 @@ fn execute_simple(
     run(executable)
 }
 
-fn run(executable: Executable) -> Result<ExitStatus, &'static str> {
+fn run(executable: Executable) -> Result<ExitStatus, ExecuteError> {
     if let Ok(execution_result) = run_internal(executable.command, executable.args) {
         Ok(execution_result)
     } else {
@@ -359,18 +367,18 @@ fn run(executable: Executable) -> Result<ExitStatus, &'static str> {
 
         let mut command = Command::new(executable.command);
         command.args(executable.args);
-        
+
         // Parse write fd
         for (from, to) in executable.redirects.write {
             if from == 1 {
                 match File::create(to) {
                     std::io::Result::Ok(file) => command.stdout(file),
-                    std::io::Result::Err(_) => return Err("Failed to open file"),
+                    std::io::Result::Err(_) => return Err(ExecuteError::StaticError("Failed to open file")),
                 };
             } else if from == 2 {
                 match File::create(to) {
                     std::io::Result::Ok(file) => command.stderr(file),
-                    std::io::Result::Err(_) => return Err("Failed to open file"),
+                    std::io::Result::Err(_) => return Err(ExecuteError::StaticError("Failed to open file")),
                 };
             } else {
                 todo!();
@@ -382,7 +390,7 @@ fn run(executable: Executable) -> Result<ExitStatus, &'static str> {
             if from == 0 {
                 match File::open(to) {
                     std::io::Result::Ok(file) => command.stdin(file),
-                    std::io::Result::Err(_) => return Err("Failed to open file"),
+                    std::io::Result::Err(_) => return Err(ExecuteError::StaticError("Failed to open file")),
                 };
             } else {
                 todo!();
@@ -395,22 +403,20 @@ fn run(executable: Executable) -> Result<ExitStatus, &'static str> {
                 match CURRENT_CHILD.lock().unwrap().as_mut().unwrap().wait() {
                     Ok(x) => Ok(x),
                     Err(x) => {
-                        eprintln!("{}", x);
-                        Err("IO Error.")
+                        Err(ExecuteError::IoError(x))
                     }
                 }
             }
             Err(x) => {
-                eprintln!("{}", x);
-                Err("Failed to spawn")
+                Err(ExecuteError::IoError(x))
             }
         }
     }
 }
 
-fn run_internal<'a>(command: &'a str, args: &'a [&'a str]) -> Result<ExitStatus, &'static str> {
+fn run_internal<'a>(command: &'a str, args: &'a [&'a str]) -> Result<ExitStatus, ExecuteError> {
     match UTIL_COMMANDS.get(command) {
         Some(util_function) => Ok(util_function(args)),
-        None => Err("Not an internal command"),
+        None => Err(ExecuteError::NotAnInner),
     }
 }
