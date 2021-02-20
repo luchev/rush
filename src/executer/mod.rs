@@ -1,6 +1,6 @@
+use crate::globals::{self, CURRENT_CHILD, UTIL_COMMANDS};
 use conch_parser::ast::*;
-use std::{os::unix::process::ExitStatusExt, process::ExitStatus, rc::Rc};
-use crate::globals::{CURRENT_CHILD, UTIL_COMMANDS};
+use std::{fs::File, os::unix::process::ExitStatusExt, process::ExitStatus, rc::Rc};
 
 type PipeCommand = PipeableCommand<
     String,
@@ -60,14 +60,86 @@ type SingleCommand = PipeableCommand<
 struct Executable<'a> {
     command: &'a str,
     args: &'a [&'a str],
+    redirects: Redirects,
 }
 
 impl<'a> Executable<'a> {
-    fn from_vec(command: &'a [&'a str]) -> Executable<'a> {
+    fn from(command: &'a [&'a str], redirects: Redirects) -> Executable<'a> {
         Executable {
             command: command[0],
             args: &command[1..],
+            redirects,
         }
+    }
+}
+
+#[derive(Debug, Default)]
+struct Redirects {
+    read: Vec<(u16, String)>,
+    write: Vec<(u16, String)>,
+    read_write: Vec<(u16, String)>,
+    append: Vec<(u16, String)>,
+    clobber: Vec<(u16, String)>,
+    dup_read: bool,
+    dup_write: bool,
+}
+
+impl Redirects {
+    fn parse(&mut self, redirect: &Redirect<TopLevelWord<String>>) {
+        match redirect {
+            Redirect::Read(from, to) => match parse_toplevel_word(to) {
+                Ok(path) => self.write.push((from.unwrap_or(globals::STDIN), path)),
+                Err(err) => eprintln!("Error parsing redirect: {}", err),
+            },
+            Redirect::Write(from, to) => match parse_toplevel_word(to) {
+                Ok(path) => self.write.push((from.unwrap_or(globals::STDOUT), path)),
+                Err(err) => eprintln!("Error parsing redirect: {}", err),
+            },
+            Redirect::ReadWrite(from, to) => match parse_toplevel_word(to) {
+                Ok(path) => self.write.push((from.unwrap_or(globals::STDIN), path)),
+                Err(err) => eprintln!("Error parsing redirect: {}", err),
+            },
+            Redirect::Append(from, to) => match parse_toplevel_word(to) {
+                Ok(path) => self.write.push((from.unwrap_or(globals::STDOUT), path)),
+                Err(err) => eprintln!("Error parsing redirect: {}", err),
+            },
+            Redirect::Clobber(_, _toplevel_word) => {
+                eprintln!("Unsupported: Clobber");
+            }
+            Redirect::Heredoc(_, _toplevel_word) => {
+                eprintln!("Unsupported: Heredoc");
+            }
+            Redirect::DupRead(from, to) => {
+                eprintln!("{:?}, {:?}", from, to);
+            }
+            Redirect::DupWrite(from, to) => {
+                eprintln!("{:?}, {:?}", from, to);
+            }
+        }
+    }
+}
+
+fn parse_toplevel_word(word: &TopLevelWord<String>) -> Result<String, &'static str> {
+    match word {
+        TopLevelWord(word) => match word {
+            ComplexWord::Single(word) => match word {
+                Word::Simple(word) => match word {
+                    SimpleWord::Literal(x) => Ok(x.to_string()),
+                    SimpleWord::Escaped(x) => Ok(x.to_string()),
+                    SimpleWord::Colon => Err("Unsupported: :"),
+                    SimpleWord::Param(_x) => Err("Unsupported: Params"),
+                    SimpleWord::Question => Err("Unsupported: ?"),
+                    SimpleWord::SquareClose => Err("Unsupported: ["),
+                    SimpleWord::SquareOpen => Err("Unsupported: ]"),
+                    SimpleWord::Star => Err("Unsupported: *"),
+                    SimpleWord::Subst(_x) => Err("Unsupported: substring"),
+                    SimpleWord::Tilde => Err("Unsupported: ~"),
+                },
+                Word::SingleQuoted(word) => Ok(word.to_string()),
+                Word::DoubleQuoted(_word) => Err("Unsupported: DoubleQuoted"),
+            },
+            ComplexWord::Concat(_word) => Err("Unsupported: Concat word"),
+        },
     }
 }
 
@@ -224,7 +296,10 @@ fn execute_simple(
     if !redirects_or_env_vars.is_empty() {
         return Err("Unsupported: environment variables or redirects");
     }
+
     let mut args = vec![];
+    let mut redirects = Redirects::default();
+
     for word in redirects_or_cmd_words {
         match word {
             RedirectOrCmdWord::CmdWord(TopLevelWord(word)) => match word {
@@ -258,8 +333,8 @@ fn execute_simple(
                         }
                     },
                     Word::SingleQuoted(word) => args.push(word.as_ref()),
-                    Word::DoubleQuoted(word) => {
-                        println!("Concat: {:?}", word);
+                    Word::DoubleQuoted(_word) => {
+                        return Err("Unsupported: DoubleQuoted");
                     }
                 },
                 ComplexWord::Concat(_word) => {
@@ -267,12 +342,12 @@ fn execute_simple(
                 }
             },
             RedirectOrCmdWord::Redirect(redirect) => {
-                println!("{:?}", redirect);
+                redirects.parse(redirect);
             }
         }
     }
 
-    let executable = Executable::from_vec(&args);
+    let executable = Executable::from(&args, redirects);
     run(executable)
 }
 
@@ -282,10 +357,39 @@ fn run(executable: Executable) -> Result<ExitStatus, &'static str> {
     } else {
         use std::process::Command;
 
-        match Command::new(executable.command)
-            .args(executable.args)
-            .spawn()
-        {
+        let mut command = Command::new(executable.command);
+        command.args(executable.args);
+        
+        // Parse write fd
+        for (from, to) in executable.redirects.write {
+            if from == 1 {
+                match File::create(to) {
+                    std::io::Result::Ok(file) => command.stdout(file),
+                    std::io::Result::Err(_) => return Err("Failed to open file"),
+                };
+            } else if from == 2 {
+                match File::create(to) {
+                    std::io::Result::Ok(file) => command.stderr(file),
+                    std::io::Result::Err(_) => return Err("Failed to open file"),
+                };
+            } else {
+                todo!();
+            }
+        }
+
+        // Parse read fd
+        for (from, to) in executable.redirects.read {
+            if from == 0 {
+                match File::open(to) {
+                    std::io::Result::Ok(file) => command.stdin(file),
+                    std::io::Result::Err(_) => return Err("Failed to open file"),
+                };
+            } else {
+                todo!();
+            }
+        }
+
+        match command.spawn() {
             Ok(x) => {
                 *CURRENT_CHILD.lock().unwrap() = Some(x);
                 match CURRENT_CHILD.lock().unwrap().as_mut().unwrap().wait() {
