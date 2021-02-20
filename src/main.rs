@@ -15,14 +15,14 @@ fn main() {
     conf.load();
     loop {
         match conf.prompt.next() {
-            prompt::Result::Commands(x) => {
+            prompt::PromptResult::Commands(x) => {
                 let status = execute(x);
                 if let Err(x) = status {
                     eprintln!("Prompt error: {}", x)
                 }
             }
-            prompt::Result::Error(x) => println!("{}", x),
-            prompt::Result::Eof => process::exit(0),
+            prompt::PromptResult::Error(x) => println!("{}", x),
+            prompt::PromptResult::Eof => process::exit(0),
         }
     }
 }

@@ -6,7 +6,7 @@ use std::io;
 use std::io::Write;
 
 #[derive(Debug)]
-pub enum Result {
+pub enum PromptResult {
     Commands(Vec<TopLevelCommand<String>>),
     Eof,
     Error(ParseError::<String>),
@@ -42,27 +42,27 @@ impl Default for Prompt {
 }
 
 impl Prompt {
-    pub fn next(&self) -> Result {
+    pub fn next(&self) -> PromptResult {
         let stdin = io::stdin();
         let mut stdout = io::stdout();
         let mut line = String::new();
 
         let _ = stdout.write(self.ps1.as_bytes());
         let _ = stdout.flush();
-        let mut state = Result::Error(ParseError::Custom("".to_string()));
-        while let Result::Error(_) = state {
+        let mut state = PromptResult::Error(ParseError::Custom("".to_string()));
+        while let PromptResult::Error(_) = state {
             state = match stdin.read_line(&mut line) {
-                Ok(0) => return Result::Eof,
-                Err(x) => Result::Error(ParseError::Custom(x.to_string())),
+                Ok(0) => return PromptResult::Eof,
+                Err(x) => PromptResult::Error(ParseError::Custom(x.to_string())),
                 _ => {
                     if line.len() >= 2 && &line[line.len()-2..] == "\\\n" {
                         line = String::from(&line[..line.len()-2]);
-                        Result::Error(ParseError::Custom("".to_string()))
+                        PromptResult::Error(ParseError::Custom("".to_string()))
                     } else {
                         let lexer = Lexer::new(line.chars());
                         match DefaultParser::new(lexer).into_iter().collect::<std::result::Result<Vec<TopLevelCommand<String>>, _>>() {
-                            Ok(x) => Result::Commands(x),
-                            Err(x) => Result::Error(ParseError::Custom(x.to_string())),
+                            Ok(x) => PromptResult::Commands(x),
+                            Err(x) => PromptResult::Error(ParseError::Custom(x.to_string())),
                         }
                     }
                 }
