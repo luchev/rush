@@ -21,3 +21,7 @@ lazy_static! {
         map
     };
 }
+
+pub const STDIN: u16 = 0;
+pub const STDOUT: u16 = 1;
+// pub const STDERR: u16 = 2;
