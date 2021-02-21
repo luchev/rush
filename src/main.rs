@@ -29,7 +29,7 @@ fn main() {
                     }
                 }
             }
-            prompt::PromptResult::Error(x) => println!("{}", x),
+            prompt::PromptResult::Error(x) => eprintln!("{}", x),
             prompt::PromptResult::Eof => process::exit(0),
             prompt::PromptResult::Interrupt => (),
         }

@@ -23,7 +23,6 @@ pub fn exit(args: &[&str]) -> ExitStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_exit_err() {

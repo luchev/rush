@@ -32,7 +32,6 @@ fn basename_one(path: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_basename_one() {

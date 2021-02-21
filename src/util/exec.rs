@@ -17,7 +17,6 @@ pub fn exec(args: &[&str]) -> ExitStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pretty_assertions::assert_eq;
 
     #[test]
     fn test_exec_err() {
