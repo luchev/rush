@@ -1,8 +1,0 @@
-# binaries
-helpers/echo-exit
-helpers/echo-rot13
-helpers/echo-signal
-helpers/exit-status-0
-helpers/fd-perms
-helpers/list-fds
-helpers/timeout

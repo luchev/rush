@@ -1,3 +1,0 @@
-# not part of posix shell
-→ cat <(echo foo)
-← foo
