@@ -2,6 +2,8 @@
 
 RUst SHell.
 
+![](https://github.com/luchev/rush/blob/master/demo.gif?raw=true)
+
 ## Installation
 
 To build the project you will need the Nightly [Rust compiler](https://rustup.rs/). You'll need to activate the nightly mode
