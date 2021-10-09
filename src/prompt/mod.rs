@@ -3,7 +3,7 @@ use conch_parser::{
     lexer::Lexer,
     parse::{DefaultParser, ParseError},
 };
-use rustyline::{error::ReadlineError};
+use rustyline::error::ReadlineError;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug)]
@@ -62,8 +62,8 @@ impl Prompt {
                         {
                             Ok(x) => {
                                 rl.add_history_entry(line.clone());
-                                return PromptResult::Commands(x)
-                            },
+                                return PromptResult::Commands(x);
+                            }
                             Err(x) => PromptResult::Error(ParseError::Custom(x.to_string())),
                         }
                     }

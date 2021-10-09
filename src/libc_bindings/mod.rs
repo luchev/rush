@@ -1,4 +1,4 @@
-use std::ffi::{CString, CStr};
+use std::ffi::{CStr, CString};
 
 pub fn user_home_dir_by_user_name(name: &str) -> Result<String, String> {
     let user = match CString::new(name) {

@@ -1,13 +1,16 @@
 mod config;
 mod executer;
+mod globals;
 mod libc_bindings;
 mod prompt;
 mod signals;
 mod util;
-mod globals;
-use crate::{config::Config, executer::{execute, ExecuteError}};
+use crate::{
+    config::Config,
+    executer::{execute, ExecuteError},
+};
+use rustyline::Editor;
 use std::process;
-use rustyline::{Editor};
 
 fn main() {
     signals::init();
@@ -23,7 +26,7 @@ fn main() {
                 let status = execute(x);
                 if let Err(x) = status {
                     if let ExecuteError::Empty = x {
-                       // pass
+                        // pass
                     } else {
                         eprintln!("Prompt error: {:?}", x)
                     }

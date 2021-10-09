@@ -156,7 +156,8 @@ pub fn execute(commands: Vec<TopLevelCommand<String>>) -> Result<ExitStatus, Exe
     commands
         .into_iter()
         .map(execute_toplevel_command)
-        .last().unwrap_or(Err(ExecuteError::Empty))
+        .last()
+        .unwrap_or(Err(ExecuteError::Empty))
 }
 
 fn execute_toplevel_command(command: TopLevelCommand<String>) -> Result<ExitStatus, ExecuteError> {
@@ -239,7 +240,9 @@ fn execute_single(command: SingleCommand) -> Result<ExitStatus, ExecuteError> {
 
             match command.kind {
                 CompoundCommandKind::Subshell(commands) => execute_subshell(commands),
-                CompoundCommandKind::Brace(_commands) => Err(ExecuteError::Unsupported("Compound command Brace")),
+                CompoundCommandKind::Brace(_commands) => {
+                    Err(ExecuteError::Unsupported("Compound command Brace"))
+                }
                 CompoundCommandKind::While(_guard_body_pair) => {
                     Err(ExecuteError::Unsupported("Compound command While"))
                 }
@@ -260,7 +263,9 @@ fn execute_single(command: SingleCommand) -> Result<ExitStatus, ExecuteError> {
                 }
             }
         }
-        PipeableCommand::FunctionDef(_name, _body) => Err(ExecuteError::Unsupported("Function definition")),
+        PipeableCommand::FunctionDef(_name, _body) => {
+            Err(ExecuteError::Unsupported("Function definition"))
+        }
     }
 }
 
@@ -302,7 +307,9 @@ fn execute_simple(
         redirects_or_cmd_words,
     } = command.as_ref();
     if !redirects_or_env_vars.is_empty() {
-        return Err(ExecuteError::StaticError("Unsupported: environment variables or redirects"));
+        return Err(ExecuteError::StaticError(
+            "Unsupported: environment variables or redirects",
+        ));
     }
 
     let mut args = vec![];
@@ -373,12 +380,16 @@ fn run(executable: Executable) -> Result<ExitStatus, ExecuteError> {
             if from == 1 {
                 match File::create(to) {
                     std::io::Result::Ok(file) => command.stdout(file),
-                    std::io::Result::Err(_) => return Err(ExecuteError::StaticError("Failed to open file")),
+                    std::io::Result::Err(_) => {
+                        return Err(ExecuteError::StaticError("Failed to open file"))
+                    }
                 };
             } else if from == 2 {
                 match File::create(to) {
                     std::io::Result::Ok(file) => command.stderr(file),
-                    std::io::Result::Err(_) => return Err(ExecuteError::StaticError("Failed to open file")),
+                    std::io::Result::Err(_) => {
+                        return Err(ExecuteError::StaticError("Failed to open file"))
+                    }
                 };
             } else {
                 todo!();
@@ -390,7 +401,9 @@ fn run(executable: Executable) -> Result<ExitStatus, ExecuteError> {
             if from == 0 {
                 match File::open(to) {
                     std::io::Result::Ok(file) => command.stdin(file),
-                    std::io::Result::Err(_) => return Err(ExecuteError::StaticError("Failed to open file")),
+                    std::io::Result::Err(_) => {
+                        return Err(ExecuteError::StaticError("Failed to open file"))
+                    }
                 };
             } else {
                 todo!();
@@ -402,14 +415,10 @@ fn run(executable: Executable) -> Result<ExitStatus, ExecuteError> {
                 *CURRENT_CHILD.lock().unwrap() = Some(x);
                 match CURRENT_CHILD.lock().unwrap().as_mut().unwrap().wait() {
                     Ok(x) => Ok(x),
-                    Err(x) => {
-                        Err(ExecuteError::IoError(x))
-                    }
+                    Err(x) => Err(ExecuteError::IoError(x)),
                 }
             }
-            Err(x) => {
-                Err(ExecuteError::IoError(x))
-            }
+            Err(x) => Err(ExecuteError::IoError(x)),
         }
     }
 }
